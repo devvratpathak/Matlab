@@ -70,11 +70,6 @@ add_block('simulink/Ports & Subsystems/Out1', [model_name, '/Driver_Controller_W
 add_block('simulink/User-Defined Functions/MATLAB Function', [model_name, '/Driver_Controller_Wrapper/ControlLogic'], ...
     'Position', [100, 50, 200, 100]);
 
-% Connect ports in subsystem
-add_line([model_name, '/Driver_Controller_Wrapper'], 'v_target_in/1', 'ControlLogic/1');
-add_line([model_name, '/Driver_Controller_Wrapper'], 'v_actual_in/1', 'ControlLogic/2');
-add_line([model_name, '/Driver_Controller_Wrapper'], 'ControlLogic/1', 'T_req_out/1');
-
 driver_code = sprintf([...
     'function T_req = ControlLogic(v_target, v_actual)\n', ...
     '%% Longitudinal Driver PI Controller\n', ...
@@ -95,12 +90,17 @@ driver_code = sprintf([...
     '    T_req = -min(abs(control_effort) / 200.0, 1.0) * 400.0;\n', ...
     'end\n']);
 
-% Set the MATLAB function code
+% Set the MATLAB function code FIRST (before connecting lines)
 sf = sfroot;
 chart = sf.find('Path', [model_name, '/Driver_Controller_Wrapper/ControlLogic'], '-isa', 'Stateflow.EMChart');
 if ~isempty(chart)
     chart.Script = driver_code;
 end
+
+% NOW connect ports in subsystem (after function signature is defined)
+add_line([model_name, '/Driver_Controller_Wrapper'], 'v_target_in/1', 'ControlLogic/1');
+add_line([model_name, '/Driver_Controller_Wrapper'], 'v_actual_in/1', 'ControlLogic/2');
+add_line([model_name, '/Driver_Controller_Wrapper'], 'ControlLogic/1', 'T_req_out/1');
 
 % Set sample time on the wrapper subsystem to 0.1s (discrete)
 set_param([model_name, '/Driver_Controller_Wrapper'], 'SampleTime', '0.1');
