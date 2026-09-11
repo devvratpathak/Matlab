@@ -102,7 +102,7 @@ add_line([model_name, '/Driver_Controller_Wrapper'], 'v_target_in/1', 'ControlLo
 add_line([model_name, '/Driver_Controller_Wrapper'], 'v_actual_in/1', 'ControlLogic/2');
 add_line([model_name, '/Driver_Controller_Wrapper'], 'ControlLogic/1', 'T_req_out/1');
 
-% Set sample time on the wrapper subsystem - use ExecutionContextMapping instead
+% Set sample time on the wrapper subsystem - use TreatAsAtomicUnit
 set_param([model_name, '/Driver_Controller_Wrapper'], 'TreatAsAtomicUnit', 'on');
 
 % Add Rate Transition to smooth discrete signal to continuous
@@ -155,8 +155,7 @@ if ~isempty(chart_ems)
     chart_ems.Script = ems_block_code;
 end
 
-% Keep EMS as continuous (no persistent state needed)
-set_param([model_name, '/Supervisory_EMS'], 'SampleTime', '-1');
+% Keep EMS as continuous - no explicit SampleTime needed for MATLAB Functions (defaults to continuous)
 
 % -------------------------------------------------------------
 % D. Powertrain & Battery Physical Plant
@@ -193,7 +192,8 @@ chart_plant = sf.find('Path', [model_name, '/Powertrain_Plant'], '-isa', 'Statef
 if ~isempty(chart_plant)
     chart_plant.Script = plant_code;
 end
-set_param([model_name, '/Powertrain_Plant'], 'SampleTime', '-1');
+
+% Keep Powertrain_Plant continuous
 
 % -------------------------------------------------------------
 % E. Battery SOC Integrator
@@ -233,7 +233,8 @@ chart_veh = sf.find('Path', [model_name, '/Vehicle_Dynamics'], '-isa', 'Stateflo
 if ~isempty(chart_veh)
     chart_veh.Script = veh_dyn_code;
 end
-set_param([model_name, '/Vehicle_Dynamics'], 'SampleTime', '-1');
+
+% Keep Vehicle_Dynamics continuous
 
 % -------------------------------------------------------------
 % G. Vehicle Velocity Integrator (State feedback)
