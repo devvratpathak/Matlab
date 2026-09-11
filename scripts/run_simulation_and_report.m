@@ -16,8 +16,15 @@ script_dir = fileparts(mfilename('fullpath'));
 project_root = fileparts(script_dir);
 addpath(genpath(project_root));
 
+disp(sprintf('Script directory: %s', script_dir));
+disp(sprintf('Project root: %s', project_root));
+
 % 1. Load Parameters
-run(fullfile(project_root, 'params', 'hev_p2_params.m'));
+params_file = fullfile(project_root, 'params', 'hev_p2_params.m');
+if ~isfile(params_file)
+    error('Parameters file not found at: %s', params_file);
+end
+evalin('base', sprintf('run(''%s'')', params_file));
 
 % 2. Define or Load Drive Cycle (WLTP Class 3 Drive Cycle)
 % If standard cycle mat file not available, generate representative cycle
@@ -47,10 +54,18 @@ assignin('base', 'drive_cycle_data', drive_cycle_data);
 model_name = 'hev_p2_model';
 model_file = fullfile(project_root, [model_name, '.slx']);
 
-if ~exist(model_file, 'file')
-    disp('Simulink model file not found. Generating model now...');
-    run(fullfile(project_root, 'scripts', 'build_hev_simulink_model.m'));
+% CRITICAL: Delete old model file to force rebuild with fixed sample times
+if isfile(model_file)
+    disp('Deleting old model file to rebuild with fixed sample time settings...');
+    delete(model_file);
 end
+
+disp('Generating Simulink model with discrete sample time blocks...');
+build_script = fullfile(project_root, 'scripts', 'build_hev_simulink_model.m');
+if ~isfile(build_script)
+    error('Build script not found at: %s', build_script);
+end
+evalin('base', sprintf('run(''%s'')', build_script));
 
 if ~bdIsLoaded(model_name)
     load_system(model_file);
