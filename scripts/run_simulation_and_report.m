@@ -5,6 +5,7 @@
 % and generates publication-quality figures and summary reports.
 % =========================================================================
 
+bdclose('all');
 clear; clc; close all;
 disp('=================================================================');
 disp('   HYBRID ELECTRIC VEHICLE (P2) SIMULATION & REPORT GENERATOR   ');
@@ -13,8 +14,7 @@ disp('=================================================================');
 % Determine paths relative to this script
 script_dir = fileparts(mfilename('fullpath'));
 project_root = fileparts(script_dir);
-addpath(fullfile(project_root, 'params'));
-addpath(fullfile(project_root, 'scripts'));
+addpath(genpath(project_root));
 
 % 1. Load Parameters
 run(fullfile(project_root, 'params', 'hev_p2_params.m'));
@@ -46,8 +46,8 @@ assignin('base', 'drive_cycle_data', drive_cycle_data);
 % 3. Check for Simulink Model
 model_name = 'hev_p2_model';
 model_file = fullfile(project_root, [model_name, '.slx']);
-addpath(project_root);
-if ~exist(model_file, 'file') && ~bdIsLoaded(model_name)
+
+if ~exist(model_file, 'file')
     disp('Simulink model file not found. Generating model now...');
     run(fullfile(project_root, 'scripts', 'build_hev_simulink_model.m'));
 end
@@ -138,4 +138,3 @@ if ~exist(results_dir, 'dir')
 end
 saveas(gcf, fullfile(results_dir, 'hev_simulation_dashboard.png'));
 disp(['Result dashboard figure saved to: ', fullfile(results_dir, 'hev_simulation_dashboard.png')]);
-
