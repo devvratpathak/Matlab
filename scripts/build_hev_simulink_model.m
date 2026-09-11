@@ -52,14 +52,27 @@ add_block('simulink/Sources/From Workspace', [model_name, '/DriveCycle_TargetSpe
     'Position', [40, 100, 150, 140], ...
     'VariableName', 'drive_cycle_data');
 
-% -------------------------------------------------------------
-% B. Longitudinal Driver Subsystem (PI Controller)
-% -------------------------------------------------------------
-add_block('simulink/User-Defined Functions/MATLAB Function', [model_name, '/Driver_Controller'], ...
+% Add a 0.1s discrete clock for all discrete blocks
+add_block('simulink/Sources/Clock', [model_name, '/SimulationClock'], ...
+    'Position', [40, 200, 70, 230]);
+
+% Add a Constant block for discrete sample time trigger
+add_block('simulink/Sources/Constant', [model_name, '/SampleTime_0p1s'], ...
+    'Position', [40, 250, 70, 270], 'Value', '0.1');
+
+% Add enabled subsystem wrapper for Driver_Controller with discrete sample time
+add_block('simulink/Ports & Subsystems/Enabled Subsystem', [model_name, '/Driver_Controller'], ...
     'Position', [220, 95, 360, 175]);
 
+% Modify the enabled subsystem to have discrete sample time
+set_param([model_name, '/Driver_Controller'], 'TreatAsAtomicUnit', 'on');
+
+% Add MATLAB function inside the subsystem
+add_block('simulink/User-Defined Functions/MATLAB Function', [model_name, '/Driver_Controller/ControllerLogic'], ...
+    'Position', [50, 20, 150, 60]);
+
 driver_code = sprintf([...
-    'function [accel_cmd, brake_cmd, T_req] = Driver_Controller(v_target, v_actual)\n', ...
+    'function [accel_cmd, brake_cmd, T_req] = ControllerLogic(v_target, v_actual)\n', ...
     '%% Longitudinal Driver PI Controller\n', ...
     'persistent int_err;\n', ...
     'if isempty(int_err)\n', ...
@@ -82,14 +95,19 @@ driver_code = sprintf([...
     '    T_req = -brake_cmd * 400.0;\n', ...
     'end\n']);
 
-% Apply driver MATLAB Function block script with DISCRETE sample time
+% Apply driver MATLAB Function block script
 sf = sfroot;
-chart = sf.find('Path', [model_name, '/Driver_Controller'], '-isa', 'Stateflow.EMChart');
+chart = sf.find('Path', [model_name, '/Driver_Controller/ControllerLogic'], '-isa', 'Stateflow.EMChart');
 if ~isempty(chart)
     chart.Script = driver_code;
 end
-% Set sample time to 0.1s (discrete) to allow persistent variables
-set_param([model_name, '/Driver_Controller'], 'SampleTime', '0.1');
+
+% Use Rate Transition block for discrete-to-continuous conversion
+add_block('simulink/Signal Attributes/Rate Transition', [model_name, '/Driver_RateTransition'], ...
+    'Position', [370, 95, 420, 175]);
+
+% Set rate transition to 0.1s discrete to continuous
+set_param([model_name, '/Driver_RateTransition'], 'InputPortSampleTime', '0.1');
 
 % -------------------------------------------------------------
 % C. Hybrid Vehicle Control Unit (EMS / VCU)
@@ -140,8 +158,14 @@ chart_ems = sf.find('Path', [model_name, '/Supervisory_EMS'], '-isa', 'Stateflow
 if ~isempty(chart_ems)
     chart_ems.Script = ems_block_code;
 end
-% Set sample time to 0.1s (discrete)
+
+% Set sample time through block properties (Stateflow execution)
 set_param([model_name, '/Supervisory_EMS'], 'SampleTime', '0.1');
+
+% Rate transition for EMS output
+add_block('simulink/Signal Attributes/Rate Transition', [model_name, '/EMS_RateTransition'], ...
+    'Position', [610, 90, 660, 210]);
+set_param([model_name, '/EMS_RateTransition'], 'InputPortSampleTime', '0.1');
 
 % -------------------------------------------------------------
 % D. Powertrain & Battery Physical Plant
@@ -183,8 +207,12 @@ chart_plant = sf.find('Path', [model_name, '/Powertrain_Plant'], '-isa', 'Statef
 if ~isempty(chart_plant)
     chart_plant.Script = plant_code;
 end
-% Set sample time to 0.1s (discrete)
 set_param([model_name, '/Powertrain_Plant'], 'SampleTime', '0.1');
+
+% Rate transition for Plant output
+add_block('simulink/Signal Attributes/Rate Transition', [model_name, '/Plant_RateTransition'], ...
+    'Position', [860, 85, 910, 235]);
+set_param([model_name, '/Plant_RateTransition'], 'InputPortSampleTime', '0.1');
 
 % -------------------------------------------------------------
 % E. Battery SOC Integrator
@@ -225,8 +253,12 @@ chart_veh = sf.find('Path', [model_name, '/Vehicle_Dynamics'], '-isa', 'Stateflo
 if ~isempty(chart_veh)
     chart_veh.Script = veh_dyn_code;
 end
-% Set sample time to 0.1s (discrete)
 set_param([model_name, '/Vehicle_Dynamics'], 'SampleTime', '0.1');
+
+% Rate transition for Dynamics output
+add_block('simulink/Signal Attributes/Rate Transition', [model_name, '/Dyn_RateTransition'], ...
+    'Position', [1080, 85, 1130, 185]);
+set_param([model_name, '/Dyn_RateTransition'], 'InputPortSampleTime', '0.1');
 
 % -------------------------------------------------------------
 % G. Vehicle Velocity Integrator (State feedback)
@@ -256,7 +288,8 @@ disp('Connecting model signal lines...');
 try
     add_line(model_name, 'DriveCycle_TargetSpeed/1', 'Driver_Controller/1');
     add_line(model_name, 'Velocity_Integrator/1', 'Driver_Controller/2');
-    add_line(model_name, 'Driver_Controller/3', 'Supervisory_EMS/1');
+    add_line(model_name, 'Driver_Controller/1', 'Driver_RateTransition/1');
+    add_line(model_name, 'Driver_RateTransition/1', 'Supervisory_EMS/1');
     add_line(model_name, 'Velocity_Integrator/1', 'Supervisory_EMS/2');
     add_line(model_name, 'SOC_Integrator/1', 'Supervisory_EMS/3');
     % Constant Gear 3 default for simplified transmission loop
@@ -264,20 +297,23 @@ try
         'Position', [340, 240, 370, 260], 'Value', '3');
     add_line(model_name, 'Gear_Selector/1', 'Supervisory_EMS/4');
     
-    add_line(model_name, 'Supervisory_EMS/2', 'Powertrain_Plant/1'); % T_eng
+    add_line(model_name, 'Supervisory_EMS/2', 'EMS_RateTransition/1');
+    add_line(model_name, 'EMS_RateTransition/1', 'Powertrain_Plant/1'); % T_eng
     add_line(model_name, 'Supervisory_EMS/3', 'Powertrain_Plant/2'); % T_mot
     add_line(model_name, 'Velocity_Integrator/1', 'Powertrain_Plant/3');
     add_line(model_name, 'SOC_Integrator/1', 'Powertrain_Plant/4');
     add_line(model_name, 'Gear_Selector/1', 'Powertrain_Plant/5');
     
-    add_line(model_name, 'Powertrain_Plant/4', 'SOC_Integrator/1'); % delta_soc
+    add_line(model_name, 'Powertrain_Plant/4', 'Plant_RateTransition/1');
+    add_line(model_name, 'Plant_RateTransition/1', 'SOC_Integrator/1'); % delta_soc
     add_line(model_name, 'SOC_Integrator/1', 'Battery_SOC_Scope/1');
     
     add_line(model_name, 'Powertrain_Plant/1', 'Vehicle_Dynamics/1'); % T_prop
     add_line(model_name, 'Supervisory_EMS/4', 'Vehicle_Dynamics/2'); % T_fric
     add_line(model_name, 'Velocity_Integrator/1', 'Vehicle_Dynamics/3');
     
-    add_line(model_name, 'Vehicle_Dynamics/2', 'Velocity_Integrator/1'); % a_veh -> v
+    add_line(model_name, 'Vehicle_Dynamics/2', 'Dyn_RateTransition/1');
+    add_line(model_name, 'Dyn_RateTransition/1', 'Velocity_Integrator/1'); % a_veh -> v
     add_line(model_name, 'Velocity_Integrator/1', 'Vehicle_Speed_Scope/1');
     
     disp('All signals connected successfully.');
@@ -288,4 +324,3 @@ end
 save_system(model_name, fullfile(project_root, [model_name, '.slx']));
 disp(['Simulink model "', fullfile(project_root, [model_name, '.slx']), '" generated and saved successfully!']);
 disp('You can now open and simulate this model in MATLAB or MATLAB Online.');
-
