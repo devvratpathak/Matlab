@@ -82,12 +82,14 @@ driver_code = sprintf([...
     '    T_req = -brake_cmd * 400.0;\n', ...
     'end\n']);
 
-% Apply driver MATLAB Function block script
+% Apply driver MATLAB Function block script with DISCRETE sample time
 sf = sfroot;
 chart = sf.find('Path', [model_name, '/Driver_Controller'], '-isa', 'Stateflow.EMChart');
 if ~isempty(chart)
     chart.Script = driver_code;
 end
+% Set sample time to 0.1s (discrete) to allow persistent variables
+set_param([model_name, '/Driver_Controller'], 'SampleTime', '0.1');
 
 % -------------------------------------------------------------
 % C. Hybrid Vehicle Control Unit (EMS / VCU)
@@ -138,6 +140,8 @@ chart_ems = sf.find('Path', [model_name, '/Supervisory_EMS'], '-isa', 'Stateflow
 if ~isempty(chart_ems)
     chart_ems.Script = ems_block_code;
 end
+% Set sample time to 0.1s (discrete)
+set_param([model_name, '/Supervisory_EMS'], 'SampleTime', '0.1');
 
 % -------------------------------------------------------------
 % D. Powertrain & Battery Physical Plant
@@ -179,6 +183,8 @@ chart_plant = sf.find('Path', [model_name, '/Powertrain_Plant'], '-isa', 'Statef
 if ~isempty(chart_plant)
     chart_plant.Script = plant_code;
 end
+% Set sample time to 0.1s (discrete)
+set_param([model_name, '/Powertrain_Plant'], 'SampleTime', '0.1');
 
 % -------------------------------------------------------------
 % E. Battery SOC Integrator
@@ -219,6 +225,8 @@ chart_veh = sf.find('Path', [model_name, '/Vehicle_Dynamics'], '-isa', 'Stateflo
 if ~isempty(chart_veh)
     chart_veh.Script = veh_dyn_code;
 end
+% Set sample time to 0.1s (discrete)
+set_param([model_name, '/Vehicle_Dynamics'], 'SampleTime', '0.1');
 
 % -------------------------------------------------------------
 % G. Vehicle Velocity Integrator (State feedback)
