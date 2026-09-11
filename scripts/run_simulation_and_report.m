@@ -50,6 +50,9 @@ speed_target_ms = speed_target_kmh / 3.6;
 drive_cycle_data = timeseries(speed_target_ms, time_vec);
 assignin('base', 'drive_cycle_data', drive_cycle_data);
 
+% Define simulation time span (capture now while time_vec is in scope)
+sim_time_span = [0, max(time_vec)];
+
 % 3. Check for Simulink Model
 model_name = 'hev_p2_model';
 model_file = fullfile(project_root, [model_name, '.slx']);
@@ -70,9 +73,6 @@ evalin('base', sprintf('run(''%s'')', build_script));
 if ~bdIsLoaded(model_name)
     load_system(model_file);
 end
-
-% Define simulation time span (time_vec is defined in this workspace)
-sim_time_span = [0, max(time_vec)];
 
 disp('Running vehicle simulation over drive cycle...');
 tic;
