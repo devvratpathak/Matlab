@@ -102,8 +102,7 @@ add_line([model_name, '/Driver_Controller_Wrapper'], 'v_target_in/1', 'ControlLo
 add_line([model_name, '/Driver_Controller_Wrapper'], 'v_actual_in/1', 'ControlLogic/2');
 add_line([model_name, '/Driver_Controller_Wrapper'], 'ControlLogic/1', 'T_req_out/1');
 
-% Set sample time on the wrapper subsystem to 0.1s (discrete)
-set_param([model_name, '/Driver_Controller_Wrapper'], 'SampleTime', '0.1');
+% Set sample time on the wrapper subsystem - use ExecutionContextMapping instead
 set_param([model_name, '/Driver_Controller_Wrapper'], 'TreatAsAtomicUnit', 'on');
 
 % Add Rate Transition to smooth discrete signal to continuous
