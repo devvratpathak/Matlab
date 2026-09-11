@@ -71,11 +71,14 @@ if ~bdIsLoaded(model_name)
     load_system(model_file);
 end
 
+% Define simulation time span (time_vec is defined in this workspace)
+sim_time_span = [0, max(time_vec)];
+
 disp('Running vehicle simulation over drive cycle...');
 tic;
 
 sim_options = simset('SrcWorkspace', 'base');
-simOut = sim(model_name, [0, max(time_vec)]);
+simOut = sim(model_name, sim_time_span);
 sim_time = toc;
 disp(sprintf('Simulation completed in %.2f seconds.', sim_time));
 
