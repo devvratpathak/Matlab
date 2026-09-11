@@ -58,7 +58,6 @@ add_block('simulink/Ports & Subsystems/Subsystem', [model_name, '/Driver_Control
     'Position', [220, 95, 360, 175]);
 
 % Delete default input/output ports in the subsystem
-delete_line([model_name, '/Driver_Controller_Wrapper'], 'In1', 'Out1');
 delete_block([model_name, '/Driver_Controller_Wrapper/In1']);
 delete_block([model_name, '/Driver_Controller_Wrapper/Out1']);
 
